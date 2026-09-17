@@ -1,0 +1,50 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    environment:
+      CHROMA_DIR: chroma_db
+      PDF_IN: data_in/document.pdf
+      LLAMA_SERVER_URL: http://llama:8080
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      - ./data_in:/app/data_in:ro
+      - ./web:/app/web:ro
+    depends_on:
+      - llama
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    command: [
+      "--model","/models/${LLAMA_MODEL}",
+      "--host","0.0.0.0",
+      "--port","8080",
+      "--ctx-size","${LLAMA_CTX_SIZE:-2048}",
+      "--batch-size","${LLAMA_BATCH:-512}",
+      "--n-gpu-layers","${LLAMA_N_GPU_LAYERS:-999}",
+      "--threads","${LLAMA_THREADS:-4}"
+    ]
+    volumes:
+      - ./Models:/models:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    depends_on: [api]
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./ops/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8088:80"
+    restart: unless-stopped

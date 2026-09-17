@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local RAG Assistant</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='56' fill='%230170b6'/%3E%3Cpath d='M56 168h56v32H56a32 32 0 0 1-32-32V88a32 32 0 0 1 32-32h56v32H56v80zm88-112h56a32 32 0 0 1 32 32v80a32 32 0 0 1-32 32h-56v-32h56V88h-56V56z' fill='white'/%3E%3C/svg%3E" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    :root{
+      --rag-blue:#0170b6;
+      --rag-blue-2:#aacfe8;
+      --rag-orange:#f58220;
+      --rag-white:#ffffff;
+    }
+    html, body { height: 100%; font-size: 0.9rem; }
+    body { height: 100vh; }
+    .scroll-shadow{ mask-image:linear-gradient(to bottom,transparent 0, black 24px, black calc(100% - 24px), transparent 100%); }
+    .msg p{ margin:.5rem 0; }
+    .msg pre{ padding:1rem; border-radius:.75rem; overflow:auto; }
+    .msg code{ font-size:.9em; }
+    .btn-disabled{ opacity:.5; pointer-events:none; }
+    .brand-card{ background:linear-gradient(180deg,var(--rag-white),rgba(170,207,232,.25)); border-color:rgba(1,112,182,.12); }
+    .brand-kbd{ background: rgba(170,207,232,.05); }
+    .brand-focus{ outline: none; box-shadow: 0 0 0 3px rgba(1,112,182,.2); }
+  </style>
+</head>
+<body class="bg-[rgba(245,130,32,0.10)] text-slate-900">
+  <div class="h-full grid grid-rows-[auto,1fr,auto]">
+    <!-- Header -->
+    <header class="relative border-b border-[rgba(1,112,182,0.15)] bg-white/90 backdrop-blur sticky top-0 z-20">
+      <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="size-9 rounded-xl bg-[color:var(--rag-blue)] grid place-items-center text-white font-bold">RAG</div>
+          <div>
+            <h1 class="text-lg font-semibold">Local RAG Assistant <span class="text-[color:var(--rag-blue)]">POC</span></h1>
+            <p class="text-xs text-slate-500">
+              RAG sur documentation indexée — moteur :
+              <span class="font-medium text-slate-700">Local (llama.cpp)</span>
+            </p>
+          </div>
+          <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[rgba(245,130,32,0.1)] text-[color:var(--rag-orange)] border border-[rgba(245,130,32,0.35)]">POC</span>
+        </div>
+
+        <div class="flex items-center gap-3 text-sm">
+          <div class="flex items-center gap-2">
+            <span id="api-dot" class="size-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span id="api-status" class="text-slate-600">Statut API…</span>
+          </div>
+          <div class="hidden sm:flex items-center gap-2 text-slate-300 select-none">|</div>
+          <div class="hidden sm:flex items-center gap-2 text-slate-600">
+            <span class="text-slate-400">Latence</span>
+            <span id="latency" class="font-medium">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="h-1 bg-gradient-to-r from-[color:var(--rag-blue)] via-[color:var(--rag-orange)] to-[color:var(--rag-blue)]/80 opacity-20"></div>
+
+      <!-- Bandeau warmup overlay (compact, ne pousse pas le layout) -->
+      <div id="warmup-banner"
+           class="hidden border-t border-[rgba(1,112,182,0.12)] bg-[rgba(1,112,182,0.06)]">
+        <div class="mx-auto max-w-6xl h-6 px-3 text-xs text-slate-600 flex items-center gap-2 leading-none">
+          <i data-lucide="loader-2" class="size-3.5 animate-spin"></i>
+          <span>Initialisation du modèle…</span>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- Main -->
+    <main class="mx-auto max-w-6xl w-full grid grid-cols-1 lg:grid-cols-[1fr,22rem] gap-4 p-4 overflow-hidden">
+      <!-- Chat -->
+      <section class="bg-white rounded-2xl shadow-sm border border-[rgba(1,112,182,0.12)] grid grid-rows-[1fr,auto] min-h-0">
+        <!-- Messages -->
+        <div id="messages" class="scroll-shadow overflow-y-auto p-4 space-y-4 min-h-0">
+          <div class="flex gap-3">
+            <div class="shrink-0 size-9 rounded-xl bg-[color:var(--rag-blue-2)] grid place-items-center">🤖</div>
+            <article class="msg grow bg-[rgba(170,207,232,0.25)] border border-[rgba(1,112,182,0.12)] rounded-2xl px-4 py-3">
+              <p class="text-sm text-slate-700">Bonjour ! Pose-moi une question sur la documentation indexée. Les sources utilisées seront indiquées.</p>
+              <ul class="mt-2 text-xs text-slate-600 list-disc pl-5">
+                <li>Astuce : <kbd class="px-1.5 py-0.5 rounded brand-kbd">Entrée</kbd> pour envoyer, <kbd class="px-1.5 py-0.5 rounded brand-kbd">Shift</kbd>+<kbd class="px-1.5 py-0.5 rounded brand-kbd">Entrée</kbd> pour une nouvelle ligne.</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+        <!-- Composer -->
+        <div class="border-t border-[rgba(1,112,182,0.12)] p-3">
+          <form id="composer" class="grid grid-cols-[1fr,auto] items-center gap-3">
+            <textarea id="prompt" rows="1" placeholder="Écris ta question…" class="grow resize-none h-11 min-h-11 max-h-[220px] rounded-2xl border border-[rgba(245,130,32,0.35)] focus:border-[color:var(--rag-orange)] focus:ring-[rgba(245,130,32,0.25)] px-4 py-3 outline-none"></textarea>
+            <button id="send" type="submit" class="inline-flex items-center justify-center gap-2 rounded-2xl px-4 sm:px-5 h-11 text-sm font-medium shadow-sm hover:shadow transition bg-[color:var(--rag-orange)] text-white hover:bg-[color:var(--rag-orange)]/90 hover:text-white">
+              <span class="hidden sm:inline">Envoyer</span>
+              <i data-lucide="send" class="size-4 relative top-px"></i>
+            </button>
+          </form>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-700">
+            <label class="inline-flex items-center gap-2">
+              <input id="toggle-sources" type="checkbox" class="rounded border-[rgba(1,112,182,0.35)] text-[color:var(--rag-blue)] focus:ring-[rgba(1,112,182,0.2)]" checked /> Afficher les sources
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Side -->
+      <aside class="space-y-4 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-[rgba(1,112,182,0.12)] p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-slate-700">Statut & Perf</h2>
+            <button id="reingest" class="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium bg-[color:var(--rag-orange)] text-white hover:bg-[color:var(--rag-orange)]/90" title="">
+              Ré-ingester <i data-lucide="refresh-ccw" class="size-4"></i>
+            </button>
+          </div>
+          <p id="ingest-result" class="mt-2 text-xs text-slate-500 hidden"></p>
+          <dl class="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div class="rounded-xl p-3 border brand-card">
+              <dt class="text-slate-600">Réponse</dt>
+              <dd id="perf-total" class="font-semibold">—</dd>
+            </div>
+            <div class="rounded-xl p-3 border brand-card">
+              <dt class="text-slate-600">Contexte injecté</dt>
+              <dd id="perf-ctx" class="font-semibold">—</dd>
+            </div>
+            <div class="rounded-xl p-3 border brand-card">
+              <dt class="text-slate-600">Réponse générée</dt>
+              <dd id="perf-answer-words" class="font-semibold">—</dd>
+            </div>
+            <div class="rounded-xl p-3 border brand-card">
+              <dt class="text-slate-600">Passages (k)</dt>
+              <dd id="perf-hits" class="font-semibold">—</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-[rgba(1,112,182,0.12)] p-4">
+          <h2 class="text-sm font-semibold text-slate-700">Exemples rapides</h2>
+          <div id="examples-box" class="mt-2 grid gap-2">
+            <button class="px-3 py-2 rounded-xl bg-[rgba(170,207,232,0.15)] hover:bg-[rgba(170,207,232,0.25)] text-left border border-[rgba(1,112,182,0.18)] example">Quel est le sujet principal du document ?</button>
+            <button class="px-3 py-2 rounded-xl bg-[rgba(170,207,232,0.15)] hover:bg-[rgba(170,207,232,0.25)] text-left border border-[rgba(1,112,182,0.18)] example">Quels concepts importants sont présentés ?</button>
+            <button class="px-3 py-2 rounded-xl bg-[rgba(170,207,232,0.15)] hover:bg-[rgba(170,207,232,0.25)] text-left border border-[rgba(1,112,182,0.18)] example">Peux-tu résumer les informations disponibles ?</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-[rgba(1,112,182,0.12)] bg-white">
+      <div class="mx-auto max-w-6xl px-4 py-4 text-xs text-slate-500 flex items-center justify-between">
+        <div>© <span id="year"></span> Local RAG Assistant</div>
+        <div class="flex items-center gap-3">
+          <span>Local (llama.cpp)</span>
+          <span class="text-slate-300">·</span>
+          <a href="#" class="hover:text-[color:var(--rag-blue)]" id="open-settings">Paramètres</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modal -->
+  <dialog id="settings" class="rounded-2xl p-0 w-[32rem] max-w-[95vw]">
+    <form method="dialog" class="bg-white rounded-2xl border border-[rgba(1,112,182,0.2)] shadow-xl overflow-hidden">
+      <div class="p-4 border-b border-[rgba(1,112,182,0.12)]"><h3 class="font-semibold">Paramètres (lecture seule)</h3></div>
+      <div class="p-4 text-sm text-slate-600 space-y-2">
+        <p>L’UI appelle <code>POST /chat</code> et attend <code>{ answer, sources, num_ctx_chars/words, num_hits }</code>.</p>
+      </div>
+      <div class="p-3 bg-[rgba(170,207,232,0.25)] border-t border-[rgba(1,112,182,0.12)] flex justify-end gap-2"><button class="inline-flex items-center gap-2 rounded-2xl px-4 h-10 text-sm bg-[rgba(1,112,182,0.08)]">Fermer</button></div>
+    </form>
+  </dialog>
+
+  <script>
+    // Init icons + year
+    window.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Grab elements
+    const messagesEl = document.getElementById('messages');
+    const promptEl = document.getElementById('prompt');
+    const formEl = document.getElementById('composer');
+    const sendBtn = document.getElementById('send');
+    const toggleSourcesEl = document.getElementById('toggle-sources');
+    const apiDot = document.getElementById('api-dot');
+    const apiStatus = document.getElementById('api-status');
+    const latencyEl = document.getElementById('latency');
+    const perfTotal = document.getElementById('perf-total');
+    const perfCtx = document.getElementById('perf-ctx');
+    const perfHits = document.getElementById('perf-hits');
+    const perfAnswerWords = document.getElementById('perf-answer-words');
+    const reingestBtn = document.getElementById('reingest');
+    const ingestResult = document.getElementById('ingest-result');
+    const examples = document.querySelectorAll('.example');
+    const settings = document.getElementById('settings');
+    const warmupBanner = document.getElementById('warmup-banner');
+    document.getElementById('open-settings').addEventListener('click', (e)=>{ e.preventDefault(); settings.showModal();});
+
+    // Busy + Warmup states
+    let isBusy = false;
+    let isWarming = false;
+    function setUiDisabled(disabled){
+      sendBtn.disabled = disabled;
+      promptEl.disabled = disabled;
+      sendBtn.classList.toggle('opacity-60', disabled);
+      examples.forEach(b=>{ b.disabled=disabled; b.classList.toggle('btn-disabled', disabled); });
+      if (reingestBtn) { reingestBtn.disabled = disabled; reingestBtn.classList.toggle('btn-disabled', disabled); }
+    }
+    function setBusy(state){
+      isBusy = !!state;
+      setUiDisabled(isBusy || isWarming);
+    }
+    function setWarmup(state){
+      isWarming = !!state;
+      warmupBanner.classList.toggle('hidden', !isWarming);
+      if (isWarming) {
+        const oldPh = promptEl.getAttribute('data-old-ph') || promptEl.placeholder;
+        promptEl.setAttribute('data-old-ph', oldPh);
+        promptEl.placeholder = 'Initialisation du modèle…';
+      } else {
+        const oldPh = promptEl.getAttribute('data-old-ph');
+        if (oldPh) promptEl.placeholder = oldPh;
+      }
+      setUiDisabled(isBusy || isWarming);
+      lucide.createIcons();
+    }
+
+    // Resize textarea + Enter to send
+    promptEl.addEventListener('input', () => { promptEl.style.height='auto'; promptEl.style.height=Math.min(promptEl.scrollHeight,220)+'px'; });
+    promptEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitForm(); }
+    });
+
+    // Examples click
+    examples.forEach(btn => btn.addEventListener('click', () => {
+      if (isBusy || isWarming) return;
+      promptEl.value = btn.textContent.trim(); promptEl.dispatchEvent(new Event('input')); submitForm();
+    }));
+
+    function updateApiStatus(ok, t) {
+      const apiDot    = document.getElementById('api-dot');
+      const apiStatus = document.getElementById('api-status');
+      const latencyEl = document.getElementById('latency');
+      if (!apiDot || !apiStatus) return;
+      apiDot.className = 'size-2.5 rounded-full ' + (ok ? 'bg-emerald-500' : 'bg-rose-500');
+      apiStatus.textContent = ok ? 'API en ligne' : 'API hors ligne';
+      latencyEl && (latencyEl.textContent = t ? Math.round(t) + ' ms' : '—');
+    }
+
+    // Healthcheck
+    function ping(){
+      const t0=performance.now();
+      fetch('/health', { cache: 'no-store' })
+        .then(r => { updateApiStatus(r.ok, performance.now()-t0); })
+        .catch(()=> updateApiStatus(false,null));
+    }
+    ping();
+    setInterval(ping, 1000); // 1s
+
+    // Helpers
+    function scrollToBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
+    function addMsg(role, html){
+      const row = document.createElement('div'); row.className = 'flex gap-3 '+(role==='user'?'justify-end':'');
+      row.innerHTML = role==='user'?`
+        <article class="msg max-w-[85%] bg-[rgba(1,112,182,0.08)] border border-[rgba(1,112,182,0.2)] rounded-2xl px-4 py-3">${html}</article>
+        <div class="shrink-0 size-9 rounded-xl bg-[color:var(--rag-blue-2)] grid place-items-center text-white">👤</div>
+      `:`
+        <div class="shrink-0 size-9 rounded-xl bg-[color:var(--rag-blue-2)] grid place-items-center">🤖</div>
+        <article class="msg grow bg-[rgba(170,207,232,0.25)] border border-[rgba(1,112,182,0.12)] rounded-2xl px-4 py-3">${html}</article>
+      `; messagesEl.appendChild(row); scrollToBottom(); return row; }
+    function renderMarkdown(md){ const html = DOMPurify.sanitize(marked.parse(md)); const box=document.createElement('div'); box.innerHTML=html; box.querySelectorAll('pre code').forEach(hljs.highlightElement); return box.innerHTML; }
+    function escapeHtml(str){ return str.replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function countWords(s){ const m=(s||'').trim().match(/[\p{L}\p{N}’'\-]+/gu); return m?m.length:0; }
+    function showSources(list){ if(!toggleSourcesEl.checked||!Array.isArray(list)||!list.length) return ''; const items=list.map(s=>`<li class="truncate">${escapeHtml(s)}</li>`).join(''); return `<details class="mt-3 text-xs"><summary class="cursor-pointer text-slate-700 select-none">Sources</summary><ul class="mt-2 bg-white border border-[rgba(1,112,182,0.2)] rounded-xl p-3 space-y-1">${items}</ul></details>`; }
+
+    // Ré-ingestion
+    if (reingestBtn) {
+      reingestBtn.addEventListener('click', async () => {
+        if (isBusy || isWarming) return;
+        const original = reingestBtn.innerHTML;
+        setBusy(true);
+        reingestBtn.innerHTML = `Rebuild… <i data-lucide="loader-2" class="size-4 animate-spin"></i>`;
+        lucide.createIcons();
+
+        if (ingestResult) {
+          ingestResult.className = 'mt-2 text-xs text-slate-500';
+          ingestResult.textContent = `Reconstruction locale en cours…`;
+          ingestResult.classList.remove('hidden');
+        }
+        try {
+          const r = await fetch('/ingest', { method: 'POST' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const data = await r.json();
+          ingestResult.textContent = `OK · Chunks: ${data.count ?? '—'} · ${data.ms ?? '—'} ms.`;
+        } catch (err) {
+          ingestResult.textContent = `Échec ré-indexation : ${String(err.message || err)}.`;
+          ingestResult.className = 'mt-2 text-xs text-rose-700';
+        } finally {
+          reingestBtn.innerHTML = original; setBusy(false); lucide.createIcons();
+        }
+      });
+    }
+
+    // Submit
+    formEl.addEventListener('submit', (e)=>{ e.preventDefault(); submitForm(); });
+    async function submitForm(){
+      if (isBusy || isWarming) return;
+      const q = promptEl.value.trim(); if(!q) return;
+
+      const original = sendBtn.innerHTML;
+      setBusy(true);
+      sendBtn.innerHTML=`Envoi… <i data-lucide="loader-2" class="size-4 animate-spin"></i>`; lucide.createIcons();
+      addMsg('user', escapeHtml(q)); promptEl.value=''; promptEl.dispatchEvent(new Event('input'));
+      const typing = addMsg('assistant', `<span class='text-slate-500'>Rédaction en cours…</span>`);
+
+      const t0 = performance.now();
+      try{
+        const res = await fetch('/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ question:q })
+        });
+        const t = performance.now()-t0; updateApiStatus(res.ok, t);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const data = await res.json();
+
+        const html = renderMarkdown(data.answer||'—') + showSources(data.sources);
+        typing.querySelector('.msg').innerHTML = html;
+
+        // Perf panel
+        perfTotal.textContent = Math.round(t)+' ms';
+
+        // Contexte injecté (en mots si fourni, sinon depuis chars)
+        const ctxWords = (typeof data.num_ctx_words === 'number' && !Number.isNaN(data.num_ctx_words))
+          ? data.num_ctx_words
+          : (typeof data.num_ctx_chars === 'number' ? Math.max(1, Math.round(data.num_ctx_chars/5.5)) : null);
+        perfCtx.textContent = ctxWords!=null ? `${ctxWords} mots` : '—';
+
+        // Passages + taille réponse
+        perfHits.textContent = (data.num_hits??'—');
+        const aw = (data.answer||'');
+        perfAnswerWords.textContent = `${(aw && aw.trim())? aw.trim().split(/\s+/).length : 0} mots`;
+      }catch(err){
+        const safe = escapeHtml(String(err.message||err));
+        typing.querySelector('.msg').innerHTML = `<div class='text-rose-600'>Erreur : ${safe}. Assure-toi que l'API est démarrée.</div>`;
+      }finally{
+        sendBtn.innerHTML=original; setBusy(false); lucide.createIcons();
+      }
+    }
+
+    // --- Warmup LLM côté UI ---
+    async function warmupLoop(){
+      setWarmup(true);
+
+      // 1) /health si dispo
+      try {
+        const hr = await fetch('/health', { cache: 'no-store' });
+        if (hr.ok) {
+          const h = await hr.json().catch(()=>({}));
+          if (h && ((h.llm_ok === true) || (h.ok === true && h.llm_ok === undefined))) {
+            setWarmup(false);
+            return;
+          }
+        }
+      } catch(_) {}
+
+      // 2) Fallback: mini /chat silencieux
+      try{
+        const r = await fetch('/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ question:'ok', warmup:true })
+        });
+        if (r.ok) { setWarmup(false); return; }
+      }catch(_){}
+
+      setTimeout(warmupLoop, 1000);
+    }
+
+    // Démarrage
+    (function init(){
+      setWarmup(true);
+      warmupLoop();
+    })();
+  </script>
+</body>
+</html>

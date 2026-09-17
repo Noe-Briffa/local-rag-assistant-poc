@@ -1,0 +1,33 @@
+# Configuration locale
+.env
+
+# Environnements virtuels
+.venv/
+venv/
+
+# Fichiers temporaires Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs
+*.log
+
+# Données locales
+*.pkl
+*.sqlite
+Models/*
+!Models/.gitkeep
+chroma_db/*
+!chroma_db/.gitkeep
+data_in/*
+!data_in/.gitkeep
+
+# Builds locaux
+llama.cpp/build/
+
+# Autres
+.idea/
+.vscode/
+.DS_Store

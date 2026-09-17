@@ -1,0 +1,18 @@
+.git
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+.env
+*.log
+.DS_Store
+
+llama.cpp/
+start_llama.bat
+stop_llama.bat
+start_llama.py
+
+# Données montées au runtime
+Models/*
+chroma_db/*
+data_in/*
