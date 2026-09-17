@@ -51,13 +51,12 @@ LLAMA_MODEL=model.gguf
 La configuration suivante a été validée pour une architecture NVIDIA `86` :
 
 ```powershell
-$cmake = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-& $cmake -S llama.cpp -B llama.cpp/build-cuda12 -G "Visual Studio 17 2022" -A x64 `
+cmake -S llama.cpp -B llama.cpp/build-cuda12 -G "Visual Studio 17 2022" -A x64 `
   -DGGML_CUDA=ON `
   -DCMAKE_CUDA_ARCHITECTURES=86 `
-  -DCUDAToolkit_ROOT="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8" `
+  -DCUDAToolkit_ROOT="$env:CUDA_PATH" `
   -DLLAMA_CURL=OFF
-& $cmake --build llama.cpp/build-cuda12 --config Release --target llama-server --parallel
+cmake --build llama.cpp/build-cuda12 --config Release --target llama-server --parallel
 ```
 
 Le build est local et ignoré par Git. `.env.example` utilise :
@@ -117,7 +116,7 @@ uvx ruff check api scripts tests start_llama.py
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Validation native effectuée sur une RTX 3060 Laptop 6 Gio : modèle local de 4,07 Gio, contexte 4096, batch 256, 33/33 couches sur GPU. La consommation observée pendant le test était d’environ 5,2 Gio sur 6 Gio. Ces chiffres décrivent cette machine, pas une exigence universelle.
+La configuration native CUDA avec contexte 4096, batch 256 et offload GPU complet a été vérifiée sur une machine NVIDIA compatible. Ces réglages peuvent nécessiter un ajustement selon le modèle et le matériel disponibles.
 
 ## Docker Compose
 
