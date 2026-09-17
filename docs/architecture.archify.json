@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Architecture du Local RAG Assistant",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1120, 720],
+    "repository": {
+      "url": "https://github.com/Noe-Briffa/local-rag-assistant-poc",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "0bf7eb18b8248aa369f9c9f79c82081b518c45e4"
+    }
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "Utilisateur",
+      "sublabel": "Navigateur local",
+      "pos": [40, 270],
+      "size": [130, 68]
+    },
+    {
+      "id": "web-ui",
+      "type": "frontend",
+      "label": "Interface web",
+      "sublabel": "HTML + JavaScript",
+      "pos": [230, 270],
+      "size": [150, 68],
+      "sources": [
+        { "path": "web/index.html", "line": 1, "label": "Interface" }
+      ]
+    },
+    {
+      "id": "fastapi",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "API RAG :8000",
+      "tag": "4 endpoints",
+      "pos": [455, 270],
+      "size": [150, 68],
+      "sources": [
+        { "path": "api/main.py", "line": 17, "label": "Application API" }
+      ]
+    },
+    {
+      "id": "chroma",
+      "type": "database",
+      "label": "ChromaDB",
+      "sublabel": "Index vectoriel local",
+      "pos": [700, 100],
+      "size": [155, 68],
+      "sources": [
+        { "path": "api/indexer.py", "line": 97, "label": "Stockage vectoriel" }
+      ]
+    },
+    {
+      "id": "embeddings",
+      "type": "backend",
+      "label": "sentence-transformers",
+      "sublabel": "Embeddings locaux",
+      "pos": [925, 100],
+      "size": [165, 68],
+      "sources": [
+        { "path": "api/indexer.py", "line": 22, "label": "Encodeur" }
+      ]
+    },
+    {
+      "id": "llama-server",
+      "type": "backend",
+      "label": "llama-server",
+      "sublabel": "llama.cpp :8080",
+      "tag": "CUDA",
+      "pos": [700, 390],
+      "size": [155, 68],
+      "sources": [
+        { "path": "api/rag_local.py", "line": 50, "label": "Appel LLM" }
+      ]
+    },
+    {
+      "id": "gguf-model",
+      "type": "external",
+      "label": "Modèle GGUF",
+      "sublabel": "Fichier local ignoré",
+      "pos": [925, 390],
+      "size": [165, 68]
+    },
+    {
+      "id": "pdf-document",
+      "type": "external",
+      "label": "Document PDF",
+      "sublabel": "Source locale ignorée",
+      "pos": [455, 510],
+      "size": [150, 68],
+      "sources": [
+        { "path": "api/indexer.py", "line": 25, "label": "Extraction PDF" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Machine locale",
+      "wraps": ["web-ui", "fastapi", "chroma", "embeddings", "llama-server", "gguf-model", "pdf-document"],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-opens-ui",
+      "from": "user",
+      "to": "web-ui",
+      "label": "HTTP local",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ui-calls-api",
+      "from": "web-ui",
+      "to": "fastapi",
+      "label": "GET / · POST /ingest · POST /chat",
+      "labelAt": [418, 352],
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-uses-chroma",
+      "from": "fastapi",
+      "to": "chroma",
+      "label": "indexe et recherche"
+    },
+    {
+      "id": "chroma-embeds",
+      "from": "chroma",
+      "to": "embeddings",
+      "label": "calcule les vecteurs",
+      "labelAt": [890, 182]
+    },
+    {
+      "id": "api-calls-llama",
+      "from": "fastapi",
+      "to": "llama-server",
+      "label": "POST /completion"
+    },
+    {
+      "id": "llama-loads-model",
+      "from": "llama-server",
+      "to": "gguf-model",
+      "label": "charge le modèle",
+      "labelAt": [890, 472]
+    },
+    {
+      "id": "api-reads-pdf",
+      "from": "fastapi",
+      "to": "pdf-document",
+      "label": "extrait et découpe",
+      "labelAt": [530, 420]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Flux RAG",
+      "items": [
+        "Ingestion du PDF puis recherche de passages pertinents",
+        "Question et contexte envoyés au modèle local"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Exécution locale",
+      "items": [
+        "Index ChromaDB et modèle GGUF hors du dépôt",
+        "Inférence accélérée par CUDA lorsque disponible"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Surface HTTP",
+      "items": [
+        "GET / et /health",
+        "POST /ingest et /chat"
+      ]
+    }
+  ]
+}

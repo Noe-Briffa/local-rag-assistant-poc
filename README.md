@@ -8,11 +8,9 @@ Le dépôt ne contient ni modèle, ni document d’entrée, ni index préconstru
 
 ## Architecture
 
-```text
-Navigateur ── FastAPI ── ChromaDB ── sentence-transformers
-                   │
-                   └── llama-server ── modèle GGUF local
-```
+![Architecture du Local RAG Assistant](docs/architecture.png)
+
+[Ouvrir l’artefact Archify interactif](docs/architecture.html) — thèmes clair/sombre, zoom, recherche et liens vers le code. Le contenu du schéma est en français ; les contrôles intégrés du viewer Archify restent en anglais.
 
 - `api/` : API, ingestion, recherche vectorielle et génération.
 - `web/` : interface HTML/JavaScript sans étape de build.
