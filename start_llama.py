@@ -4,9 +4,10 @@ import sys
 
 from api import config
 
-exe = getattr(config, "LLAMA_SERVER_EXE", r"llama.cpp\build\bin\Release\llama-server.exe")
+exe = config.LLAMA_SERVER_EXE
 model = config.MODEL_PATH
 ctx = str(config.CTX_SIZE)
+batch = str(config.BATCH_SIZE)
 ngl = str(config.N_GPU_LAYERS)
 thr = str(config.THREADS)
 port = str(config.PORT)
@@ -22,6 +23,7 @@ cmd = [
     exe,
     "--model", model,
     "--ctx-size", ctx,
+    "--batch-size", batch,
     "--n-gpu-layers", ngl,
     "--threads", thr,
     "--port", port,

@@ -13,11 +13,12 @@ def _project_path(name: str) -> str:
 
 # --- LLM / llama.cpp ---
 LLAMA_SERVER_EXE: str = _project_path(
-    os.getenv("LLAMA_SERVER_EXE", r"llama.cpp\build\bin\Release\llama-server.exe")
+    os.getenv("LLAMA_SERVER_EXE", r"llama.cpp\build-cuda12\bin\Release\llama-server.exe")
 )
 LLAMA_SERVER_URL: str = os.getenv("LLAMA_SERVER_URL", "http://127.0.0.1:8080")
 MODEL_PATH: str = _project_path(os.path.join("Models", os.getenv("LLAMA_MODEL", "model.gguf")))
 CTX_SIZE: int = int(os.getenv("LLAMA_CTX_SIZE", "4096"))
+BATCH_SIZE: int = int(os.getenv("LLAMA_BATCH", "256"))
 N_GPU_LAYERS: int = int(os.getenv("LLAMA_N_GPU_LAYERS", "999"))
 THREADS: int = int(os.getenv("LLAMA_THREADS", "12"))
 PORT: int = int(os.getenv("PORT", "8080"))

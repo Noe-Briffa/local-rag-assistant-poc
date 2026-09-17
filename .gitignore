@@ -26,6 +26,7 @@ data_in/*
 
 # Builds locaux
 llama.cpp/build/
+llama.cpp/build-cuda12/
 
 # Autres
 .idea/
